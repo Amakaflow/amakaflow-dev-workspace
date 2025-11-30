@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # UI - React frontend
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - VITE_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY}
+    networks:
+      - amakaflow
+    depends_on:
+      - workout-ingestor
+      - mapper
+
+  # Workout Ingestor
+  workout-ingestor:
+    build:
+      context: ./workout-ingestor-api
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./workout-ingestor-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - amakaflow
+
+  # Mapper
+  mapper:
+    build:
+      context: ./mapper-api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./mapper-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - amakaflow
+
+  # Strava Sync
+  strava:
+    build:
+      context: ./strava-sync-api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./strava-sync-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - amakaflow
+
+  # Calendar API
+  calendar:
+    build:
+      context: ./calendar-api
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./calendar-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - amakaflow
+
+  # Garmin Sync (optional)
+  garmin-sync:
+    build:
+      context: ./garmin-sync-api
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./garmin-sync-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GARMIN_UNOFFICIAL_SYNC_ENABLED=${GARMIN_UNOFFICIAL_SYNC_ENABLED:-false}
+    networks:
+      - amakaflow
+    profiles:
+      - full
+
+  # Garmin USB FIT (optional)
+  garmin-usb-fit:
+    build:
+      context: ./garmin-usb-fit-api
+      dockerfile: Dockerfile
+    ports:
+      - "8095:8095"
+    volumes:
+      - ./garmin-usb-fit-api:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - amakaflow
+    profiles:
+      - full
+
+networks:
+  amakaflow:
+    driver: bridge
+
+# Usage:
+# Start core services: docker-compose up -d
+# Start all services: docker-compose --profile full up -d
+# View logs: docker-compose logs -f
+# Stop: docker-compose down

@@ -1,0 +1,45 @@
+# Environment
+.env
+.env.local
+*.env
+
+# Cloned service repos (actual code)
+amakaflow-ui/
+workout-ingestor-api/
+mapper-api/
+strava-sync-api/
+calendar-api/
+garmin-sync-api/
+garmin-usb-fit-api/
+
+# Symlinks to services
+ui
+workout-ingestor-api
+mapper-api
+strava-sync-api
+calendar-api
+garmin-sync-api
+garmin-usb-fit-api
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+*.log
