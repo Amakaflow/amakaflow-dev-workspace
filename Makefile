@@ -12,11 +12,11 @@ help:
 
 setup:
 	@test -f .env || (cp .env.example .env && echo "⚠️  Created .env - edit with your API keys!")
-	@docker-compose build
+	@docker compose build
 	@echo "✅ Setup complete!"
 
 start:
-	@docker-compose up -d
+	@docker compose up -d
 	@echo "✅ Services started!"
 	@echo ""
 	@echo "URLs:"
@@ -27,15 +27,15 @@ start:
 	@echo "  Calendar:    http://localhost:8003/docs"
 
 stop:
-	@docker-compose down
+	@docker compose down
 
 restart:
-	@docker-compose restart
+	@docker compose restart
 
 logs:
-	@docker-compose logs -f
+	@docker compose logs -f
 
 clean:
-	@docker-compose down -v
+	@docker compose down -v
 
 .DEFAULT_GOAL := help
