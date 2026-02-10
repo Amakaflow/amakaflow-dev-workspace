@@ -64,6 +64,10 @@ services:
       - TTS_DAILY_CHAR_LIMIT=${TTS_DAILY_CHAR_LIMIT:-50000}
       - RATE_LIMIT_FREE=${RATE_LIMIT_FREE:-50}
       - RATE_LIMIT_PAID=${RATE_LIMIT_PAID:-500}
+      # Internal service URLs (Docker network)
+      - MAPPER_API_URL=http://mapper:8001
+      - CALENDAR_API_URL=http://calendar:8003
+      - WORKOUT_INGESTOR_API_URL=http://workout-ingestor:8004
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
       interval: 30s
