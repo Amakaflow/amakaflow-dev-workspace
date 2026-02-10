@@ -20,6 +20,7 @@ services:
       - VITE_CALENDAR_API_URL=http://localhost:8003
       - VITE_CHAT_API_URL=http://localhost:8005
       - VITE_CHAT_ENABLED=true
+      - VITE_BYPASS_TIER_GATE=${BYPASS_TIER_GATE:-false}
     networks:
       - amakaflow
     depends_on:
@@ -145,6 +146,9 @@ services:
       - HELICONE_API_KEY=${HELICONE_API_KEY}
       - HELICONE_ENABLED=${HELICONE_ENABLED:-false}
       - YT_TRANSCRIPT_API_TOKEN=${YT_TRANSCRIPT_API_TOKEN}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN}
+      - CLERK_DOMAIN=${CLERK_DOMAIN}
+      - BYPASS_TIER_GATE=${BYPASS_TIER_GATE:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
       interval: 30s
