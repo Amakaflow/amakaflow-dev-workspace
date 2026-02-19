@@ -1,0 +1,42 @@
+#!/bin/sh
+# Pre-push hook — runs repo-specific tests before any push reaches GitHub.
+# Abort (exit 1) if tests fail so the push never lands.
+#
+# Install: scripts/install-hooks.sh (run from amakaflow-dev-workspace/)
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT" || exit 1
+
+# Detect repo type and run appropriate checks
+if [ -f "pytest.ini" ] || [ -f "pyproject.toml" ] && grep -q "pytest" pyproject.toml 2>/dev/null; then
+  echo "[pre-push] Python repo detected — running pytest + ruff"
+  python -m pytest --tb=short -q || exit 1
+  ruff check . --quiet || exit 1
+  ruff format --check . --quiet || exit 1
+
+elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
+  echo "[pre-push] Android repo detected — running Gradle test"
+  ./gradlew test --quiet || exit 1
+
+elif [ -f "Package.swift" ] || [ -f "*.xcodeproj" ] || ls *.xcworkspace 2>/dev/null; then
+  echo "[pre-push] Swift repo detected — running xcodebuild test"
+  xcodebuild test \
+    -scheme AmakaFlowCompanion \
+    -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+    -quiet 2>&1 | grep -E "(error:|warning:|FAILED|PASSED|** TEST)" || true
+  # Exit on build/test failure
+  xcodebuild test \
+    -scheme AmakaFlowCompanion \
+    -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+    -quiet > /dev/null 2>&1 || exit 1
+
+elif [ -f "supabase/config.toml" ]; then
+  echo "[pre-push] amakaflow-db detected — running supabase db lint"
+  supabase db lint --schema public || exit 1
+
+else
+  echo "[pre-push] No recognised test runner — skipping (add your repo to scripts/pre-push)"
+fi
+
+echo "[pre-push] All checks passed ✓"
+exit 0

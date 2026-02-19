@@ -1,13 +1,13 @@
 ---
 name: finish-issue
-description: Use when implementation of a Linear issue is complete and you need to run tests, get a testing gap analysis, get a code review, and create the PR. Invoke with the Linear issue ID (e.g. /finish-issue AMA-653).
+description: Use when implementation of a Linear issue is complete and you need to run tests, get a testing gap analysis, get a code review, create the PR, and confirm CI is green before declaring done. Invoke with the Linear issue ID (e.g. /finish-issue AMA-653).
 ---
 
 # Finish Issue — Quality Gate Before PR
 
 ## Overview
 
-Chains four steps in order: run tests → testing-strategist gap analysis → code-reviewer → create PR. Ensures no issue ships without passing tests, reviewed coverage, and a code quality pass.
+Chains steps in order: run tests → testing-strategist gap analysis → code-reviewer → create PR → watch CI → fix any failures. The issue is not done until CI is green.
 
 **Invoke as:** `/finish-issue AMA-NNN` (or just `/finish-issue` if already on the right branch)
 
@@ -135,17 +135,65 @@ gh pr create \
 
 ---
 
+## Step 7: Watch CI and Fix Failures
+
+After the PR is created, wait for CI and resolve any failures **before declaring the issue done**.
+
+```bash
+# Get the run ID for this branch (wait a few seconds after push for it to register)
+RUN_ID=$(gh run list \
+  --repo supergeri/[REPO] \
+  --branch [BRANCH_NAME] \
+  --limit 1 \
+  --json databaseId \
+  --jq '.[0].databaseId')
+
+# Watch until complete (blocks until done)
+gh run watch "$RUN_ID" --repo supergeri/[REPO]
+
+# Check all PR checks
+gh pr checks [PR_NUMBER] --repo supergeri/[REPO]
+```
+
+**If any check fails:**
+
+```bash
+# See exactly what failed
+gh run view "$RUN_ID" --repo supergeri/[REPO] --log-failed
+```
+
+Then:
+1. Read the failure output and identify the root cause
+2. Fix the issue locally
+3. Re-run tests (Step 2) to confirm the fix
+4. Commit and push the fix
+5. Repeat Step 7 — watch the new run until green
+
+**Do NOT declare the issue done until `gh pr checks` shows all green.**
+
+**Exception — transient CI crash** (e.g. `SDK execution error`, `rate limited`, network timeout): These are infrastructure failures, not code failures. Re-run with:
+
+```bash
+gh run rerun "$RUN_ID" --repo supergeri/[REPO] --failed
+```
+
+If the re-run passes, that's a transient failure — no code change needed.
+
+---
+
 ## Quick Reference
 
 ```
 /finish-issue AMA-NNN
   ↓
 1. git diff main...HEAD --stat       ← confirm branch + scope
-2. pytest / xcodebuild / gradlew     ← tests must pass
+2. pytest / xcodebuild / gradlew     ← tests must pass locally
 3. testing-strategist agent          ← coverage gaps
 4. code-reviewer agent               ← code quality
 5. e2e-qa-automation agent           ← only if user-facing changes
 6. gh pr create                      ← PR with full body
+7. gh run watch → gh pr checks       ← CI must be green
+   └─ if fails: fix → push → repeat
 ```
 
 ---
@@ -154,6 +202,9 @@ gh pr create \
 
 | Mistake | Fix |
 |---------|-----|
+| Declaring done before CI is green | Always run Step 7 — local tests ≠ CI |
+| Re-running CI without reading the logs | Always read `--log-failed` first |
+| Treating transient crash as a code bug | Check if it's infrastructure (SDK error, timeout) — just rerun |
 | Creating PR before tests pass | Always run tests first — no exceptions |
 | Skipping testing-strategist because "tests already exist" | Run it anyway — it catches gaps the implementer misses |
 | Skipping code-reviewer on "small" changes | Small diffs have security issues too |
