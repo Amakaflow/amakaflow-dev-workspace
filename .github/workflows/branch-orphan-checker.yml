@@ -1,0 +1,144 @@
+name: Branch Orphan Checker
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # 09:00 UTC daily
+  workflow_dispatch:      # Manual trigger for testing
+
+jobs:
+  check-orphans:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Scan for orphan branches
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          REPOS=(
+            "mapper-api"
+            "amakaflow-ui"
+            "calendar-api"
+            "chat-api"
+            "strava-sync-api"
+            "workout-ingestor-api"
+            "amakaflow-db"
+            "amakaflow-android-app"
+          )
+
+          ORPHAN_LIST=""
+          CUTOFF=$(date -d '2 days ago' --iso-8601=seconds)
+
+          for REPO in "${REPOS[@]}"; do
+            echo "Scanning supergeri/$REPO ..."
+
+            # Get all feature/AMA-* and fix/AMA-* branches
+            BRANCHES=$(gh api "repos/supergeri/$REPO/branches?per_page=100" \
+              --paginate \
+              --jq '.[] | select(.name | test("^(feature|fix)/AMA-")) | .name' \
+              2>/dev/null || true)
+
+            while IFS= read -r BRANCH; do
+              [[ -z "$BRANCH" ]] && continue
+
+              # URL-encode the branch name (handles slashes in feature/AMA-* names)
+              ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$BRANCH")
+
+              # Get last commit date on this branch
+              COMMIT_DATE=$(gh api "repos/supergeri/$REPO/branches/$ENCODED" \
+                --jq '.commit.commit.committer.date' \
+                2>/dev/null || true)
+
+              [[ -z "$COMMIT_DATE" ]] && continue
+
+              # Skip if newer than cutoff (ISO-8601 string comparison is safe)
+              if [[ "$COMMIT_DATE" > "$CUTOFF" ]]; then
+                continue
+              fi
+
+              # Check if there is an open PR for this branch
+              PR_COUNT=$(gh pr list \
+                --repo "supergeri/$REPO" \
+                --head "$BRANCH" \
+                --state open \
+                --json number \
+                --jq 'length' \
+                2>/dev/null || echo "0")
+
+              if [[ "$PR_COUNT" == "0" ]]; then
+                SHORT_DATE="${COMMIT_DATE:0:10}"
+                ORPHAN_LIST="${ORPHAN_LIST}- \`${BRANCH}\` in \`supergeri/${REPO}\` — last commit ${SHORT_DATE}\n"
+              fi
+            done <<< "$BRANCHES"
+          done
+
+          # Write multiline output safely using delimiter syntax
+          {
+            echo "orphans<<ORPHAN_EOF"
+            printf "%b" "$ORPHAN_LIST"
+            echo "ORPHAN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$ORPHAN_LIST" ]]; then
+            echo "has_orphans=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_orphans=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Manage GitHub Issue
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ORPHANS: ${{ steps.scan.outputs.orphans }}
+          HAS_ORPHANS: ${{ steps.scan.outputs.has_orphans }}
+        run: |
+          REPO="supergeri/amakaflow-dev-workspace"
+          LABEL="branch-orphan"
+          TODAY=$(date +%Y-%m-%d)
+
+          # Ensure label exists (idempotent)
+          gh label create "$LABEL" \
+            --repo "$REPO" \
+            --color "e4e669" \
+            --description "Feature/fix branch with no open PR" \
+            2>/dev/null || true
+
+          # Find existing open issue with this label
+          EXISTING_NUMBER=$(gh issue list \
+            --repo "$REPO" \
+            --label "$LABEL" \
+            --state open \
+            --json number \
+            --jq '.[0].number' \
+            2>/dev/null || true)
+
+          if [[ "$HAS_ORPHANS" == "false" ]]; then
+            echo "No orphans found."
+            if [[ -n "$EXISTING_NUMBER" ]]; then
+              gh issue close "$EXISTING_NUMBER" \
+                --repo "$REPO" \
+                --comment "All clear as of ${TODAY} — no orphan branches detected."
+              echo "Closed issue #${EXISTING_NUMBER}"
+            fi
+          else
+            BODY="## Orphan Branches Detected\n\nThe following branches are **older than 2 days with no open PR**:\n\n${ORPHANS}\n---\n**Action required:** Either open a PR for the branch or delete it.\n\n_Last checked: ${TODAY}_"
+
+            if [[ -n "$EXISTING_NUMBER" ]]; then
+              # Update body in-place and add a comment
+              gh issue edit "$EXISTING_NUMBER" \
+                --repo "$REPO" \
+                --body "$(printf '%b' "$BODY")"
+              gh issue comment "$EXISTING_NUMBER" \
+                --repo "$REPO" \
+                --body "Still detecting orphan branches as of ${TODAY}. Updated issue body with current list."
+              echo "Updated issue #${EXISTING_NUMBER}"
+            else
+              gh issue create \
+                --repo "$REPO" \
+                --title "Orphan branches detected — ${TODAY}" \
+                --body "$(printf '%b' "$BODY")" \
+                --label "$LABEL"
+              echo "Created new orphan issue"
+            fi
+          fi
