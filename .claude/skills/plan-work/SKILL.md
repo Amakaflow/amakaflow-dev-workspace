@@ -110,9 +110,10 @@ For each actionable issue, route using these heuristics:
 - Is high-risk or touches auth/security
 
 ### 3d. Codebase Health Check
-- Flag failing CI on any open PR
-- Flag stale PRs (open > 3 days with no activity)
-- Note repos with no recent activity (might indicate blocked work)
+- **Joshua's PRs are reviewed by CI/GitHub Actions — do not flag them for manual review.** Only surface a Joshua PR if CI is failing (❌).
+- Flag David's own PRs if they need attention (e.g., review requested, CI failing).
+- Flag stale PRs (open > 5 days with no CI activity and no merge) — may indicate something is stuck.
+- Note repos with no recent activity (might indicate blocked work).
 
 ## Phase 4: Output
 
@@ -150,9 +151,12 @@ Needs prep before assigning:
 - **[AMA-XXX]** — [Title] — Needs subtask breakdown
 
 ## Open PRs Needing Attention
-| PR | Repo | Author | Age | CI | Review |
-|----|------|--------|-----|-----|--------|
-| #N | repo | who | Xd | ✅/❌ | status |
+> Only shown if: CI is ❌, or author is David, or PR is open > 5 days with no activity.
+> Joshua's PRs are reviewed by CI — omit them unless CI is failing.
+
+| PR | Repo | Author | Age | CI | Issue |
+|----|------|--------|-----|----|-------|
+| #N | repo | who | Xd | ✅/❌ | reason flagged |
 
 ## Stale / Stuck Items
 - [Items in progress too long, in review too long, or abandoned]
