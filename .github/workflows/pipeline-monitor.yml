@@ -31,7 +31,7 @@ jobs:
           ACTIVE_TABLE=""
           STUCK_LIST=""
           TODAY=$(date +%Y-%m-%d)
-          CUTOFF=$(date -d '24 hours ago' --iso-8601=seconds 2>/dev/null || date -v-24H -u +%Y-%m-%dT%H:%M:%SZ)
+          CUTOFF=$(date -d '48 hours ago' --iso-8601=seconds 2>/dev/null || date -v-48H -u +%Y-%m-%dT%H:%M:%SZ)
 
           for REPO in "${REPOS[@]}"; do
             # Open PRs with AMA-* branches

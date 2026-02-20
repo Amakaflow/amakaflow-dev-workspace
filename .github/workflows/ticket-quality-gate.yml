@@ -25,7 +25,7 @@ jobs:
 
           # Fetch Todo tickets
           QUERY=$(cat <<'GRAPHQL'
-{"query": "{ issues(filter: { state: { type: { eq: \"unstarted\" } }, team: { name: { eq: \"MyAmaka\" } } }, first: 50) { nodes { identifier title description url } } }"}
+{"query": "{ issues(filter: { state: { type: { eq: \"unstarted\" } }, team: { name: { eq: \"MyAmaka\" } } }, first: 250) { nodes { identifier title description url } } }"}
 GRAPHQL
 )
 
