@@ -1,0 +1,119 @@
+name: Ticket Quality Gate
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # 23:00 UTC nightly
+  workflow_dispatch:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Scan Linear for sparse Todo tickets
+        id: scan
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "LINEAR_API_KEY not set — skipping"
+            exit 0
+          fi
+
+          # Fetch Todo tickets
+          QUERY=$(cat <<'GRAPHQL'
+{"query": "{ issues(filter: { state: { type: { eq: \"unstarted\" } }, team: { name: { eq: \"MyAmaka\" } } }, first: 50) { nodes { identifier title description url } } }"}
+GRAPHQL
+)
+
+          RESP=$(curl -sf -X POST https://api.linear.app/graphql \
+            -H "Authorization: $LINEAR_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$QUERY")
+
+          SPARSE=$(echo "$RESP" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+nodes = d.get('data', {}).get('issues', {}).get('nodes', [])
+sparse = []
+for n in nodes:
+    desc = n.get('description') or ''
+    if '## Acceptance Criteria' not in desc:
+        sparse.append(f'- [{n[\"identifier\"]}]({n[\"url\"]}) — {n[\"title\"]}')
+print('\n'.join(sparse))
+")
+
+          {
+            echo "sparse_list<<SPARSE_EOF"
+            echo "$SPARSE"
+            echo "SPARSE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$SPARSE" ]]; then
+            echo "has_sparse=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_sparse=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update GitHub Issue
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          SPARSE_LIST: ${{ steps.scan.outputs.sparse_list }}
+          HAS_SPARSE: ${{ steps.scan.outputs.has_sparse }}
+        run: |
+          REPO="supergeri/amakaflow-dev-workspace"
+          LABEL="ticket-quality"
+          TODAY=$(date +%Y-%m-%d)
+
+          gh label create "$LABEL" \
+            --repo "$REPO" \
+            --color "e4e669" \
+            --description "Linear tickets missing acceptance criteria" \
+            2>/dev/null || true
+
+          EXISTING=$(gh issue list \
+            --repo "$REPO" \
+            --label "$LABEL" \
+            --state open \
+            --json number \
+            --jq '.[0].number' 2>/dev/null || true)
+
+          if [[ "$HAS_SPARSE" == "false" ]]; then
+            echo "All Todo tickets have acceptance criteria."
+            if [[ -n "$EXISTING" ]]; then
+              gh issue close "$EXISTING" \
+                --repo "$REPO" \
+                --comment "All clear as of $TODAY — all Todo tickets have acceptance criteria."
+            fi
+            exit 0
+          fi
+
+          BODY="## Sparse Tickets — $TODAY
+
+The following **Todo** tickets are missing an \`## Acceptance Criteria\` section.
+Antfarm may pick these up and implement them incorrectly.
+
+**Action required:** Add acceptance criteria to each ticket before Antfarm picks it up.
+
+$SPARSE_LIST
+
+---
+_Checked nightly at 23:00 UTC. [Run manually](https://github.com/supergeri/amakaflow-dev-workspace/actions/workflows/ticket-quality-gate.yml)_"
+
+          if [[ -n "$EXISTING" ]]; then
+            gh issue edit "$EXISTING" \
+              --repo "$REPO" \
+              --body "$BODY"
+            gh issue comment "$EXISTING" \
+              --repo "$REPO" \
+              --body "Still detecting sparse tickets as of $TODAY. Updated list above."
+          else
+            gh issue create \
+              --repo "$REPO" \
+              --title "Sparse Linear tickets — $TODAY" \
+              --body "$BODY" \
+              --label "$LABEL"
+          fi
