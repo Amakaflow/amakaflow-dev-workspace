@@ -1,0 +1,165 @@
+name: Pipeline Monitor
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # 09:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Scan active pipelines
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          REPOS=(
+            "mapper-api"
+            "amakaflow-ui"
+            "calendar-api"
+            "chat-api"
+            "strava-sync-api"
+            "workout-ingestor-api"
+            "amakaflow-db"
+            "amakaflow-android-app"
+          )
+
+          ACTIVE_TABLE=""
+          STUCK_LIST=""
+          TODAY=$(date +%Y-%m-%d)
+          CUTOFF=$(date -d '48 hours ago' --iso-8601=seconds 2>/dev/null || date -v-48H -u +%Y-%m-%dT%H:%M:%SZ)
+
+          for REPO in "${REPOS[@]}"; do
+            # Open PRs with AMA-* branches
+            PRS=$(gh pr list \
+              --repo "supergeri/$REPO" \
+              --state open \
+              --json number,title,headRefName,createdAt,checksState \
+              --jq '.[] | select(.headRefName | test("AMA-"))' \
+              2>/dev/null || true)
+
+            if [[ -n "$PRS" ]]; then
+              while IFS= read -r PR_JSON; do
+                PR_NUM=$(echo "$PR_JSON" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['number'])")
+                PR_TITLE=$(echo "$PR_JSON" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['title'][:50])")
+                BRANCH=$(echo "$PR_JSON" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d['headRefName'])")
+                CI=$(echo "$PR_JSON" | python3 -c "import sys,json;d=json.loads(sys.stdin.read());print(d.get('checksState','unknown'))")
+                TICKET=$(echo "$BRANCH" | grep -oE 'AMA-[0-9]+' | head -1 || echo "?")
+                PR_URL="https://github.com/supergeri/$REPO/pull/$PR_NUM"
+                ACTIVE_TABLE="${ACTIVE_TABLE}| $TICKET | \`$REPO\` | [#${PR_NUM}](${PR_URL}) | $CI |\n"
+              done < <(echo "$PRS" | python3 -c "
+import sys, json
+data = sys.stdin.read().strip()
+for line in data.split('\n'):
+    if line.strip():
+        print(line.strip())
+" 2>/dev/null || echo "$PRS")
+            fi
+
+            # AMA-* branches with no open PR older than 24h (stuck in develop/audit)
+            BRANCHES=$(gh api "repos/supergeri/$REPO/branches?per_page=100" \
+              --paginate \
+              --jq '.[] | select(.name | test("^(feature|fix)/AMA-")) | .name' \
+              2>/dev/null || true)
+
+            while IFS= read -r BRANCH; do
+              [[ -z "$BRANCH" ]] && continue
+              ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$BRANCH")
+              COMMIT_DATE=$(gh api "repos/supergeri/$REPO/branches/$ENCODED" \
+                --jq '.commit.commit.committer.date' 2>/dev/null || true)
+              [[ -z "$COMMIT_DATE" ]] && continue
+              if [[ "$COMMIT_DATE" < "$CUTOFF" ]]; then
+                PR_COUNT=$(gh pr list \
+                  --repo "supergeri/$REPO" \
+                  --head "$BRANCH" \
+                  --state open \
+                  --json number \
+                  --jq 'length' 2>/dev/null || echo "0")
+                if [[ "$PR_COUNT" == "0" ]]; then
+                  TICKET=$(echo "$BRANCH" | grep -oE 'AMA-[0-9]+' | head -1 || echo "?")
+                  SHORT_DATE="${COMMIT_DATE:0:10}"
+                  STUCK_LIST="${STUCK_LIST}- \`$TICKET\` in \`supergeri/$REPO\` — branch \`$BRANCH\`, last commit $SHORT_DATE, no open PR\n"
+                fi
+              fi
+            done <<< "$BRANCHES"
+          done
+
+          {
+            echo "active_table<<TABLE_EOF"
+            printf "%b" "$ACTIVE_TABLE"
+            echo "TABLE_EOF"
+            echo "stuck_list<<STUCK_EOF"
+            printf "%b" "$STUCK_LIST"
+            echo "STUCK_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$ACTIVE_TABLE" || -n "$STUCK_LIST" ]]; then
+            echo "has_activity=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_activity=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update GitHub Issue
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ACTIVE_TABLE: ${{ steps.scan.outputs.active_table }}
+          STUCK_LIST: ${{ steps.scan.outputs.stuck_list }}
+          HAS_ACTIVITY: ${{ steps.scan.outputs.has_activity }}
+        run: |
+          REPO="supergeri/amakaflow-dev-workspace"
+          LABEL="pipeline-monitor"
+          TODAY=$(date +%Y-%m-%d)
+
+          gh label create "$LABEL" \
+            --repo "$REPO" \
+            --color "0075ca" \
+            --description "Antfarm pipeline status board" \
+            2>/dev/null || true
+
+          EXISTING=$(gh issue list \
+            --repo "$REPO" \
+            --label "$LABEL" \
+            --state open \
+            --json number \
+            --jq '.[0].number' 2>/dev/null || true)
+
+          if [[ "$HAS_ACTIVITY" == "false" ]]; then
+            echo "No active pipelines."
+            if [[ -n "$EXISTING" ]]; then
+              gh issue close "$EXISTING" \
+                --repo "$REPO" \
+                --comment "All clear as of $TODAY — no active pipelines."
+            fi
+            exit 0
+          fi
+
+          BODY="## Antfarm Pipeline Status — $TODAY\n\n"
+
+          if [[ -n "$ACTIVE_TABLE" ]]; then
+            BODY="${BODY}### Active PRs\n\n| Ticket | Repo | PR | CI |\n|---|---|---|---|\n${ACTIVE_TABLE}\n"
+          fi
+
+          if [[ -n "$STUCK_LIST" ]]; then
+            BODY="${BODY}### Stuck (no PR, >24h)\n\nThese branches have commits but no open PR — may be stuck in develop or audit step:\n\n${STUCK_LIST}\n"
+          fi
+
+          BODY="${BODY}---\n_Updated: $TODAY — [trigger manually](https://github.com/supergeri/amakaflow-dev-workspace/actions/workflows/pipeline-monitor.yml)_"
+
+          if [[ -n "$EXISTING" ]]; then
+            gh issue edit "$EXISTING" \
+              --repo "$REPO" \
+              --body "$(printf '%b' "$BODY")"
+            gh issue comment "$EXISTING" \
+              --repo "$REPO" \
+              --body "Updated $TODAY."
+          else
+            gh issue create \
+              --repo "$REPO" \
+              --title "Pipeline Monitor — $TODAY" \
+              --body "$(printf '%b' "$BODY")" \
+              --label "$LABEL"
+          fi
