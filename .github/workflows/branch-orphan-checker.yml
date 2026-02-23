@@ -35,7 +35,7 @@ jobs:
             echo "Scanning supergeri/$REPO ..."
 
             # Get all feature/AMA-* and fix/AMA-* branches
-            BRANCHES=$(gh api "repos/supergeri/$REPO/branches?per_page=100" \
+            BRANCHES=$(gh api "repos/Amakaflow/$REPO/branches?per_page=100" \
               --paginate \
               --jq '.[] | select(.name | test("^(feature|fix)/AMA-")) | .name' \
               2>/dev/null || true)
@@ -47,7 +47,7 @@ jobs:
               ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$BRANCH")
 
               # Get last commit date on this branch
-              COMMIT_DATE=$(gh api "repos/supergeri/$REPO/branches/$ENCODED" \
+              COMMIT_DATE=$(gh api "repos/Amakaflow/$REPO/branches/$ENCODED" \
                 --jq '.commit.commit.committer.date' \
                 2>/dev/null || true)
 
@@ -60,7 +60,7 @@ jobs:
 
               # Check if there is an open PR for this branch
               PR_COUNT=$(gh pr list \
-                --repo "supergeri/$REPO" \
+                --repo "Amakaflow/$REPO" \
                 --head "$BRANCH" \
                 --state open \
                 --json number \
@@ -93,7 +93,7 @@ jobs:
           ORPHANS: ${{ steps.scan.outputs.orphans }}
           HAS_ORPHANS: ${{ steps.scan.outputs.has_orphans }}
         run: |
-          REPO="supergeri/amakaflow-dev-workspace"
+          REPO="Amakaflow/amakaflow-dev-workspace"
           LABEL="branch-orphan"
           TODAY=$(date +%Y-%m-%d)
 

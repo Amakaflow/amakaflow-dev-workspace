@@ -36,7 +36,7 @@ jobs:
           for REPO in "${REPOS[@]}"; do
             # Open PRs with AMA-* branches
             PRS=$(gh pr list \
-              --repo "supergeri/$REPO" \
+              --repo "Amakaflow/$REPO" \
               --state open \
               --json number,title,headRefName,createdAt,checksState \
               --jq '.[] | select(.headRefName | test("AMA-"))' \
@@ -61,7 +61,7 @@ for line in data.split('\n'):
             fi
 
             # AMA-* branches with no open PR older than 24h (stuck in develop/audit)
-            BRANCHES=$(gh api "repos/supergeri/$REPO/branches?per_page=100" \
+            BRANCHES=$(gh api "repos/Amakaflow/$REPO/branches?per_page=100" \
               --paginate \
               --jq '.[] | select(.name | test("^(feature|fix)/AMA-")) | .name' \
               2>/dev/null || true)
@@ -69,12 +69,12 @@ for line in data.split('\n'):
             while IFS= read -r BRANCH; do
               [[ -z "$BRANCH" ]] && continue
               ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$BRANCH")
-              COMMIT_DATE=$(gh api "repos/supergeri/$REPO/branches/$ENCODED" \
+              COMMIT_DATE=$(gh api "repos/Amakaflow/$REPO/branches/$ENCODED" \
                 --jq '.commit.commit.committer.date' 2>/dev/null || true)
               [[ -z "$COMMIT_DATE" ]] && continue
               if [[ "$COMMIT_DATE" < "$CUTOFF" ]]; then
                 PR_COUNT=$(gh pr list \
-                  --repo "supergeri/$REPO" \
+                  --repo "Amakaflow/$REPO" \
                   --head "$BRANCH" \
                   --state open \
                   --json number \
@@ -110,7 +110,7 @@ for line in data.split('\n'):
           STUCK_LIST: ${{ steps.scan.outputs.stuck_list }}
           HAS_ACTIVITY: ${{ steps.scan.outputs.has_activity }}
         run: |
-          REPO="supergeri/amakaflow-dev-workspace"
+          REPO="Amakaflow/amakaflow-dev-workspace"
           LABEL="pipeline-monitor"
           TODAY=$(date +%Y-%m-%d)
 
@@ -147,7 +147,7 @@ for line in data.split('\n'):
             BODY="${BODY}### Stuck (no PR, >24h)\n\nThese branches have commits but no open PR — may be stuck in develop or audit step:\n\n${STUCK_LIST}\n"
           fi
 
-          BODY="${BODY}---\n_Updated: $TODAY — [trigger manually](https://github.com/supergeri/amakaflow-dev-workspace/actions/workflows/pipeline-monitor.yml)_"
+          BODY="${BODY}---\n_Updated: $TODAY — [trigger manually](https://github.com/Amakaflow/amakaflow-dev-workspace/actions/workflows/pipeline-monitor.yml)_"
 
           if [[ -n "$EXISTING" ]]; then
             gh issue edit "$EXISTING" \

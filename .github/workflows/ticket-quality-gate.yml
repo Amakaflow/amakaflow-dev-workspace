@@ -64,7 +64,7 @@ print('\n'.join(sparse))
           SPARSE_LIST: ${{ steps.scan.outputs.sparse_list }}
           HAS_SPARSE: ${{ steps.scan.outputs.has_sparse }}
         run: |
-          REPO="supergeri/amakaflow-dev-workspace"
+          REPO="Amakaflow/amakaflow-dev-workspace"
           LABEL="ticket-quality"
           TODAY=$(date +%Y-%m-%d)
 
@@ -101,7 +101,7 @@ Antfarm may pick these up and implement them incorrectly.
 $SPARSE_LIST
 
 ---
-_Checked nightly at 23:00 UTC. [Run manually](https://github.com/supergeri/amakaflow-dev-workspace/actions/workflows/ticket-quality-gate.yml)_"
+_Checked nightly at 23:00 UTC. [Run manually](https://github.com/Amakaflow/amakaflow-dev-workspace/actions/workflows/ticket-quality-gate.yml)_"
 
           if [[ -n "$EXISTING" ]]; then
             gh issue edit "$EXISTING" \
