@@ -68,7 +68,7 @@ Even with one main task, if there are 3+ checkboxes, add this line at the top of
 
 Every ticket MUST include ALL of these or the CI validator will block Joshua's PR:
 
-1. `## Repo:` — exact GitHub repo (`supergeri/<name>`)
+1. `## Repo:` — exact GitHub repo (`Amakaflow/<name>`)
 2. At least one `**File:**` entry with a real, verified path
 3. `## Acceptance Criteria` section
 4. At least one `- [ ]` checkbox
@@ -93,14 +93,17 @@ Count the distinct things that need to change. If > 1, create separate tickets. 
 
 **Step 3: Draft each ticket in canonical format**
 
+For backend tasks the repo is always `Amakaflow/amakaflow-backend`. File paths must include the `services/<name>/` prefix. The working directory for tests is `services/<name>/`.
+
 ```
-## Repo: `supergeri/<repo-name>`
+## Repo: `Amakaflow/amakaflow-backend`
 
 <1-2 sentence context explaining the why>
 
 ## Task
 
-**File:** `<exact/verified/path/to/file.ext>`
+**Service:** `services/<service-name>/`
+**File:** `services/<service-name>/<exact/verified/path/to/file.ext>`
 **Function/Location:** `<function name or line range>`
 
 <Specific instructions — exact logic to add or change. Include the before/after if helpful.>
@@ -110,11 +113,17 @@ Count the distinct things that need to change. If > 1, create separate tickets. 
 ⚠️ Do NOT mark done until every checkbox is manually verified.
 
 - [ ] <Single, specific, verifiable outcome>
-- [ ] All tests pass: `<test command>`
+- [ ] All tests pass: `cd services/<service-name> && pytest`
 
 ## Manual Test (if applicable)
 
 <Step-by-step instructions for David to verify after deploy>
+```
+
+For non-backend repos (amakaflow-ui, amakaflow-android-app, etc.) use the standard format:
+
+```
+## Repo: `Amakaflow/<repo-name>`
 ```
 
 **Step 4: Confirm with David**
@@ -134,21 +143,25 @@ Once approved, create using:
 
 Report back the ticket identifier (e.g. `AMA-701`) and URL.
 
-## Test commands by repo
+## Test commands by service/repo
 
-| Repo | Test command |
-|------|-------------|
-| `mapper-api` | `pytest` |
-| `calendar-api` | `pytest` |
-| `chat-api` | `pytest` |
-| `strava-sync-api` | `pytest` |
-| `workout-ingestor-api` | `pytest` |
+All backend services live in `Amakaflow/amakaflow-backend`. Always `cd` into the service directory before running tests.
+
+| Service / Repo | Test command |
+|----------------|-------------|
+| `amakaflow-backend` → `services/chat-api` | `cd services/chat-api && pytest` |
+| `amakaflow-backend` → `services/mapper-api` | `cd services/mapper-api && pytest` |
+| `amakaflow-backend` → `services/calendar-api` | `cd services/calendar-api && pytest` |
+| `amakaflow-backend` → `services/workout-ingestor-api` | `cd services/workout-ingestor-api && pytest` |
+| `amakaflow-backend` → `services/strava-sync-api` | `cd services/strava-sync-api && pytest` |
+| `amakaflow-backend` → `services/garmin-sync-api` | `cd services/garmin-sync-api && pytest` |
+| `amakaflow-backend` → `db/` | `supabase db lint` |
 | `amakaflow-ui` | `npm test` |
 | `amakaflow-android-app` | `./gradlew testDebugUnitTest` |
-| `amakaflow-db` | `supabase db lint` |
 | `amakaflow-ios-app` | `xcodebuild test -scheme AmakaFlowCompanion -destination 'platform=iOS Simulator,name=iPhone 17 Pro'` |
 
 > **Note:** `amakaflow-ios-app` is David's domain — Joshua should not be assigned iOS tickets. If you're about to create an iOS ticket for Joshua, stop and reassign to David.
+> **Note:** The old standalone repos (`chat-api`, `mapper-api`, etc.) are archived. Do NOT reference them in tickets.
 
 ## Red flags — stop and fix before creating
 
