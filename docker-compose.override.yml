@@ -7,24 +7,44 @@ services:
       - ./amakaflow-ui:/app
       - /app/node_modules
     command: npm run dev -- --host 0.0.0.0
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   chat:
     volumes:
-      - ./chat-api:/app
+      - ../amakaflow-backend/services/chat-api:/app
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8005 --reload
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   mapper:
     volumes:
-      - ./mapper-api:/app
+      - ../amakaflow-backend/services/mapper-api:/app
       - ./amakaflow-fitfiletool:/amakaflow-fitfiletool:ro
     command: uvicorn backend.app:app --host 0.0.0.0 --port 8001 --reload
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   calendar:
     volumes:
-      - ./calendar-api:/app
+      - ../amakaflow-backend/services/calendar-api:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   workout-ingestor:
     volumes:
-      - ./workout-ingestor-api:/app
+      - ../amakaflow-backend/services/workout-ingestor-api:/app
     command: uvicorn workout_ingestor_api.main:app --host 0.0.0.0 --port 8004 --reload
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536

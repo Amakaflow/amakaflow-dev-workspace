@@ -40,7 +40,7 @@ services:
   # Chat API - AI conversation service
   chat:
     build:
-      context: ./chat-api
+      context: ../amakaflow-backend/services/chat-api
       dockerfile: Dockerfile
     ports:
       - "8005:8005"
@@ -81,7 +81,7 @@ services:
   # Mapper API - Exercise mapping service
   mapper:
     build:
-      context: ./mapper-api
+      context: ../amakaflow-backend/services/mapper-api
       dockerfile: Dockerfile
     ports:
       - "8001:8001"
@@ -106,7 +106,7 @@ services:
   # Calendar API - Calendar integration service
   calendar:
     build:
-      context: ./calendar-api
+      context: ../amakaflow-backend/services/calendar-api
       dockerfile: Dockerfile
     ports:
       - "8003:8003"
@@ -130,7 +130,7 @@ services:
   # Workout Ingestor API - Video/OCR ingestion service
   workout-ingestor:
     build:
-      context: ./workout-ingestor-api
+      context: ../amakaflow-backend/services/workout-ingestor-api
       dockerfile: Dockerfile
     ports:
       - "8004:8004"
