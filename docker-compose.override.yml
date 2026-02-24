@@ -1,5 +1,5 @@
 # Development overrides - automatically loaded with docker-compose.yml
-# Enables hot reload via volume mounts
+# Enables hot reload via volume mounts and auto-rebuild on requirements.txt changes
 
 services:
   ui:
@@ -20,6 +20,17 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    develop:
+      watch:
+        - action: sync
+          path: ../amakaflow-backend/services/chat-api
+          target: /app
+          ignore:
+            - __pycache__
+            - "*.pyc"
+            - .venv
+        - action: rebuild
+          path: ../amakaflow-backend/services/chat-api/requirements.txt
 
   mapper:
     volumes:
@@ -30,6 +41,17 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    develop:
+      watch:
+        - action: sync
+          path: ../amakaflow-backend/services/mapper-api
+          target: /app
+          ignore:
+            - __pycache__
+            - "*.pyc"
+            - .venv
+        - action: rebuild
+          path: ../amakaflow-backend/services/mapper-api/requirements.txt
 
   calendar:
     volumes:
@@ -39,6 +61,17 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    develop:
+      watch:
+        - action: sync
+          path: ../amakaflow-backend/services/calendar-api
+          target: /app
+          ignore:
+            - __pycache__
+            - "*.pyc"
+            - .venv
+        - action: rebuild
+          path: ../amakaflow-backend/services/calendar-api/requirements.txt
 
   workout-ingestor:
     volumes:
@@ -48,3 +81,14 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    develop:
+      watch:
+        - action: sync
+          path: ../amakaflow-backend/services/workout-ingestor-api
+          target: /app
+          ignore:
+            - __pycache__
+            - "*.pyc"
+            - .venv
+        - action: rebuild
+          path: ../amakaflow-backend/services/workout-ingestor-api/requirements.txt

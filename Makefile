@@ -1,4 +1,4 @@
-.PHONY: help setup start stop restart logs clean build status \
+.PHONY: help setup start stop restart logs clean build status watch \
         ui chat mapper calendar ingestor \
         logs-ui logs-chat logs-mapper logs-calendar logs-ingestor
 
@@ -15,6 +15,7 @@ help:
 	@echo ""
 	@echo "Running:"
 	@echo "  make start      - Start all services"
+	@echo "  make watch      - Start all services + auto-rebuild on requirements.txt changes"
 	@echo "  make stop       - Stop all services"
 	@echo "  make restart    - Restart all services"
 	@echo "  make status     - Show service status"
@@ -46,6 +47,10 @@ setup:
 
 build:
 	@docker compose build --no-cache
+
+watch:
+	@docker compose up -d
+	@docker compose watch
 
 start:
 	@docker compose up -d
